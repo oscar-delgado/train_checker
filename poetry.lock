@@ -152,6 +152,17 @@ files = [
 ]
 
 [[package]]
+name = "demjson3"
+version = "3.0.6"
+description = "encoder, decoder, and lint/validator for JSON (JavaScript Object Notation) compliant with RFC 7159"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "demjson3-3.0.6.tar.gz", hash = "sha256:37c83b0c6eb08d25defc88df0a2a4875d58a7809a9650bd6eee7afd8053cdbac"},
+]
+
+[[package]]
 name = "idna"
 version = "3.16"
 description = "Internationalized Domain Names in Applications (IDNA)"
@@ -209,4 +220,4 @@ zstd = ["backports-zstd (>=1.0.0) ; python_version < \"3.14\""]
 [metadata]
 lock-version = "2.1"
 python-versions = "3.14.3"
-content-hash = "e6c0ea0caef298eae47ab0c68c19c86f588606d8d768d2364152ade2a0e305fa"
+content-hash = "983b90cfcc30762b8bec7a930191461a1306c7fafe46beff1e83cf5d278c1fec"
