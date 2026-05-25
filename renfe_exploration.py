@@ -14,13 +14,10 @@ headers = {
     "Content-Type": "text/plain",
     "Origin": "https://venta.renfe.com",
     "Referer": "https://venta.renfe.com/vol/buscarTrenEnlaces.do?c=_Lids",
-    "Akamai-Key": "MADRI, BARCE, 25/05/2026, 26/05/2026, IV, , 1, 0, 0, 0, 0, 0, 0, 0, , , , ,",
+    "Akamai-Key": "MADRI, BARCE, 26/05/2026, 27/05/2026, IV, , 1, 0, 0, 0, 0, 0, 0, 0, , , , ,",
 }
 
-cookies = {
-    "DWRSESSIONID": "d6yocUc3sSt97$qMkmocT8QfuVp",
-    "JSESSIONID": "0000R878LyBkO1uDFXbet8ZDEMh:1firqj3ag",
-}
+cookies = {}
 
 payload = """callCount=1
 windowName=
@@ -63,8 +60,9 @@ response = requests.post(
 if not response.ok:
     raise RuntimeError("Error getting trains")
 
-pattern = r'handleCallback\(".*?",".*?",(.*)\)\s*;?'
-match = re.search(pattern, response.text, re.DOTALL)
+pattern = r'handle(?:Exception|Data)\([^,]+,[^,]+,(\{.*?\})\);'
+match = re.compile(pattern, re.DOTALL).search(response.text)
 obj_text = match.group(1)
 
-data = demjson3.decode(obj_text)
+data: dict = demjson3.decode(obj_text)
+print(data.keys())

@@ -44,7 +44,7 @@ payload = {
     "destination": "7171801",  # Barcelona Sants
     "passengers": [{"discount_cards": [], "disability_type": "NH", "type": "A"}],
     "outbound_date": "2026-06-10",
-    "inbound_date": "2026-06-14",
+    "inbound_date": "2026-06-15",
     "with_ttt": False,
 }
 response = requests.post(
