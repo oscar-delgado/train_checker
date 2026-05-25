@@ -1,0 +1,17 @@
+[project]
+name = "train_checker"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Oscar Delgado",email = "oscar.d.cuestas@gmail.com"}
+]
+readme = "README.md"
+requires-python = "3.14.3"
+dependencies = [
+    "requests (>=2.34.2,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
