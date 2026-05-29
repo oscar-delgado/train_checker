@@ -34,13 +34,13 @@ payload = {
             "origin": "60000",
             "destination": "71801",
             "direction": "outbound",
-            "departure": "2026-05-30",
+            "departure": "2026-06-10",
         },
         {
             "origin": "71801",
             "destination": "60000",
             "direction": "inbound",
-            "departure": "2026-06-02",
+            "departure": "2026-06-15",
         },
     ],
 }
