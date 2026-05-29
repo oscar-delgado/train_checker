@@ -60,7 +60,7 @@ response = requests.post(
 if not response.ok:
     raise RuntimeError("Error getting trains")
 
-pattern = r'handle(?:Exception|Data)\([^,]+,[^,]+,(\{.*?\})\);'
+pattern = r"handle(?:Exception|Data)\([^,]+,[^,]+,(\{.*?\})\);"
 match = re.compile(pattern, re.DOTALL).search(response.text)
 obj_text = match.group(1)
 

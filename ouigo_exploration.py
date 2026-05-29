@@ -59,10 +59,10 @@ data: dict = response.json()
 # Explore results
 print("\nIda:")
 for train in data.get("outbound"):
-    dep_time = train['departure_station']['departure_timestamp']
+    dep_time = train["departure_station"]["departure_timestamp"]
     print(f"{dep_time}: {train['price']} ({train['service_name']})")
 
 print("\nVuelta")
 for train in data.get("inbound"):
-    dep_time = train['departure_station']['departure_timestamp']
+    dep_time = train["departure_station"]["departure_timestamp"]
     print(f"{dep_time}: {train['price']} ({train['service_name']})")
