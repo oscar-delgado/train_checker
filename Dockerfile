@@ -12,6 +12,9 @@ COPY pyproject.toml poetry.lock ./
 
 RUN poetry install
 
+RUN poetry run playwright install chromium
+RUN poetry run playwright install-deps
+
 COPY . .
 
-CMD [ "sleep", "infinity" ]
+CMD [ "python", "src/main.py" ]

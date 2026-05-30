@@ -8,10 +8,9 @@ For now, we are only evaluating the APIs for Madrid-Barcelona two-way travels.
 
 ## 🛠️ Build and run
 
-For now, its only a docker environment in which do some explorations. Use the following:
+Use the following commands to build the image and run the container:
 
 ```sh
 docker build -t train_checker .
 docker run --rm --name train_checker -v .:/app -t train_checker
-docker kill train_checker
 ```

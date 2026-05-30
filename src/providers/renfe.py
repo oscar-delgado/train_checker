@@ -58,7 +58,6 @@ def get_trains_html(
         page = ctx.new_page()
 
         # ── Step 1: visit renfe.com to get AMCV / OneTrust / f5 cookies ──────
-        print("  [1/3] Loading renfe.com to warm up session cookies…")
         try:
             page.goto(HOME_URL, wait_until="domcontentloaded", timeout=30_000)
             # Accept cookie banner if present
@@ -71,7 +70,6 @@ def get_trains_html(
             print("       Warning: renfe.com load timed out, continuing anyway.")
 
         # ── Step 2: POST search form via fetch() from inside the page ─────────
-        print("  [2/3] Submitting train search…")
         form_params = {
             "tipoBusqueda": "autocomplete",
             "currenLocation": "menuBusqueda",
@@ -124,7 +122,6 @@ def get_trains_html(
         page.evaluate(submit_js)
 
         # ── Step 3: wait for the results page ────────────────────────────────
-        print("  [3/3] Waiting for results…")
         try:
             time.sleep(2)
             # Wait for either the results table or a known error element
@@ -151,13 +148,6 @@ def get_trains_html(
         html = page.content()
         browser.close()
         return html
-
-
-def _penc(v: str) -> str:
-    """Percent-encode a form value (simple version)."""
-    from urllib.parse import quote_plus
-
-    return quote_plus(str(v))
 
 
 # ---------------------------------------------------------------------------
@@ -240,14 +230,9 @@ def build_args() -> argparse.Namespace:
     return ap.parse_args()
 
 
-def main() -> None:
+def run():
+    print("–– RENFE ––")
     args = build_args()
-
-    print("\nRenfe train search")
-    print(f"  {args.origen_name}  →  {args.destino_name}")
-    print(f"  Ida: {args.ida}   Vuelta: {args.vuelta}   Adultos: {args.adultos}")
-    print()
-
     html = get_trains_html(
         origen_name=args.origen_name,
         origen_code=args.origen,
@@ -258,11 +243,8 @@ def main() -> None:
         adultos=args.adultos,
         headless=args.headless,
     )
-
-    print(f"\nResponse size: {len(html):,} characters")
     trains = parse_trains(html)
 
-    # ── Print results ────────────────────────────────────────────────────────
     for direction, entries in trains.items():
         print(direction)
         if entries:
@@ -271,7 +253,3 @@ def main() -> None:
                 print(f"{t['departure']}: {price} ({t['train_type']})")
         else:
             print("(none parsed)")
-
-
-if __name__ == "__main__":
-    main()
