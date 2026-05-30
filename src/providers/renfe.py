@@ -1,4 +1,3 @@
-import argparse
 import json
 from time import sleep
 from datetime import date, datetime, time, timedelta, timezone
@@ -52,9 +51,7 @@ def get_trains_html(
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) "
                 "Gecko/20100101 Firefox/151.0"
             ),
-            extra_http_headers={
-                "Accept-Language": "en,es-ES;q=0.9,ca;q=0.8",
-            },
+            extra_http_headers={"Accept-Language": "en,es-ES;q=0.9,ca;q=0.8"},
         )
         page = ctx.new_page()
 
@@ -68,7 +65,7 @@ def get_trains_html(
                 pass  # no banner — fine
             sleep(1)
         except PWTimeout:
-            print("       Warning: renfe.com load timed out, continuing anyway.")
+            print("Warning: renfe.com load timed out, continuing anyway.")
 
         # ── Step 2: POST search form via fetch() from inside the page ─────────
         form_params = {
@@ -128,12 +125,12 @@ def get_trains_html(
             # Wait for either the results table or a known error element
             page.wait_for_selector("#listaTrenesTBodyIda > *", timeout=10_000)
         except PWTimeout:
-            print("       Warning: results selector not found within 10 s.")
+            print("Warning: results selector not found within 10 s.")
 
         # Handle QueueIT waiting room — if we land there, wait up to 3 min
         for _ in range(36):
             if "queue-it" in page.url or "queueit" in page.url.lower():
-                print("       QueueIT waiting room detected, waiting 5 s…")
+                print("QueueIT waiting room detected, waiting 5 s…")
                 sleep(5)
                 try:
                     page.wait_for_selector(
@@ -203,38 +200,18 @@ def _time(tag) -> time:
 
 
 # ---------------------------------------------------------------------------
-# CLI
+# RUN
 # ---------------------------------------------------------------------------
 
 
-def build_args() -> argparse.Namespace:
-    ap = argparse.ArgumentParser(description="Renfe train search scraper")
-    ap.add_argument(
-        "--origen",
-        default=DEFAULT_ORIGEN_CODE,
-        help="Origin station code  (default: Alicante Terminal)",
-    )
-    ap.add_argument("--origen-name", default=DEFAULT_ORIGEN_NAME)
-    ap.add_argument(
-        "--destino",
-        default=DEFAULT_DESTINO_CODE,
-        help="Destination station code  (default: A Coruña)",
-    )
-    ap.add_argument("--destino-name", default=DEFAULT_DESTINO_NAME)
-    return ap.parse_args()
-
-
 def run(outbound_date: date, inbound_date: date):
-    args = build_args()
     html = get_trains_html(
-        origen_name=args.origen_name,
-        origen_code=args.origen,
-        destino_name=args.destino_name,
-        destino_code=args.destino,
+        origen_name=DEFAULT_ORIGEN_NAME,
+        origen_code=DEFAULT_ORIGEN_CODE,
+        destino_name=DEFAULT_DESTINO_NAME,
+        destino_code=DEFAULT_DESTINO_CODE,
         fecha_ida=outbound_date.strftime("%d/%m/%Y"),
         fecha_vuelta=inbound_date.strftime("%d/%m/%Y"),
-        adultos=1,
-        headless=True,
     )
     trains = parse_trains(html)
 
