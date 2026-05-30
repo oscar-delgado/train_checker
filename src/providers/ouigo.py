@@ -1,11 +1,12 @@
 import json
 import requests
+from datetime import date
 
 
 BASE_API = "https://mdw02.api-es.ouigo.com/api"
 
 
-def run():
+def run(outbound_date: date, inbound_date: date):
     print("–– OUIGO ––")
     # Make login request to get token
     url = f"{BASE_API}/Token/login"
@@ -44,8 +45,8 @@ def run():
         "origin": "MT1",  # Madrid P. Atocha
         "destination": "7171801",  # Barcelona Sants
         "passengers": [{"discount_cards": [], "disability_type": "NH", "type": "A"}],
-        "outbound_date": "2026-06-10",
-        "inbound_date": "2026-06-15",
+        "outbound_date": outbound_date.isoformat(),
+        "inbound_date": inbound_date.isoformat(),
         "with_ttt": False,
     }
     response = requests.post(

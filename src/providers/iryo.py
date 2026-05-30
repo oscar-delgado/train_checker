@@ -1,4 +1,5 @@
 import requests
+from datetime import date
 
 
 HEADERS = {
@@ -17,7 +18,7 @@ HEADERS = {
 }
 
 
-def run():
+def run(outbound_date: date, inbound_date: date):
     print("–– IRYO ––")
     login_url = "https://api.iryo.eu/b2c/config/sales-channel?lang=es&kcClient=b2c&requestChannel=WEB&uuid="
     response = requests.get(login_url, headers=HEADERS)
@@ -38,13 +39,13 @@ def run():
                 "origin": "60000",
                 "destination": "71801",
                 "direction": "outbound",
-                "departure": "2026-06-10",
+                "departure": outbound_date.isoformat(),
             },
             {
                 "origin": "71801",
                 "destination": "60000",
                 "direction": "inbound",
-                "departure": "2026-06-15",
+                "departure": inbound_date.isoformat(),
             },
         ],
     }

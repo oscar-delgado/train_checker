@@ -1,6 +1,7 @@
 import argparse
 import json
 import time
+from datetime import date
 
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
@@ -12,8 +13,6 @@ DEFAULT_ORIGEN_NAME = "MADRID-PUERTA DE ATOCHA"
 DEFAULT_ORIGEN_CODE = "0071,60000,60000"
 DEFAULT_DESTINO_NAME = "BARCELONA-SANTS"
 DEFAULT_DESTINO_CODE = "0071,71801,71801"
-TODAY = "10/06/2026"
-TOMORROW = "15/06/2026"
 
 SEARCH_URL = "https://venta.renfe.com/vol/buscarTren.do?Idioma=es&Pais=ES"
 HOME_URL = "https://www.renfe.com/es/es"
@@ -171,11 +170,11 @@ def parse_trains(html: str) -> dict:
             if len(times) < 2:
                 continue
             departure = _text(times[0])
+            if not departure:
+                continue
             arrival = _text(times[1])
             train_type = "AVE"
             prices = [_text(card) for card in row.select(".precio-cards")]
-            if not departure:
-                continue
             result[direction].append(
                 {
                     "train_type": train_type,
@@ -211,26 +210,10 @@ def build_args() -> argparse.Namespace:
         help="Destination station code  (default: A Coruña)",
     )
     ap.add_argument("--destino-name", default=DEFAULT_DESTINO_NAME)
-    ap.add_argument(
-        "--ida", default=TODAY, help="Outbound date  DD/MM/YYYY  (default: today)"
-    )
-    ap.add_argument(
-        "--vuelta",
-        default=TOMORROW,
-        help="Return date    DD/MM/YYYY  (default: tomorrow)",
-    )
-    ap.add_argument("--adultos", type=int, default=1)
-    ap.add_argument(
-        "--no-headless",
-        dest="headless",
-        action="store_false",
-        help="Show the browser window (useful for debugging)",
-    )
-    ap.set_defaults(headless=True)
     return ap.parse_args()
 
 
-def run():
+def run(outbound_date: date, inbound_date: date):
     print("–– RENFE ––")
     args = build_args()
     html = get_trains_html(
@@ -238,10 +221,10 @@ def run():
         origen_code=args.origen,
         destino_name=args.destino_name,
         destino_code=args.destino,
-        fecha_ida=args.ida,
-        fecha_vuelta=args.vuelta,
-        adultos=args.adultos,
-        headless=args.headless,
+        fecha_ida=outbound_date.strftime("%d/%m/%Y"),
+        fecha_vuelta=inbound_date.strftime("%d/%m/%Y"),
+        adultos=1,
+        headless=True,
     )
     trains = parse_trains(html)
 
@@ -249,7 +232,7 @@ def run():
         print(direction)
         if entries:
             for t in entries:
-                price = min(t["prices"])
+                price = min(t["prices"]) if t["prices"] else None
                 print(f"{t['departure']}: {price} ({t['train_type']})")
         else:
             print("(none parsed)")
