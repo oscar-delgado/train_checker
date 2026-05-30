@@ -1,160 +1,277 @@
-import re
-import demjson3
-import requests
+import argparse
+import json
 import time
-import random
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0",
-    "Accept": "*/*",
-    "Accept-Language": "en,es-ES;q=0.9,ca;q=0.8",
-    "Content-Type": "text/plain",
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-origin",
-    "Pragma": "no-cache",
-    "Cache-Control": "no-cache",
-    "Origin": "https://venta.renfe.com",
-    "Referer": "https://venta.renfe.com/vol/buscarTrenEnlaces.do",
-}
+from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
+# ---------------------------------------------------------------------------
+# Defaults
+# ---------------------------------------------------------------------------
+DEFAULT_ORIGEN_NAME = "MADRID-PUERTA DE ATOCHA"
+DEFAULT_ORIGEN_CODE = "0071,60000,60000"
+DEFAULT_DESTINO_NAME = "BARCELONA-SANTS"
+DEFAULT_DESTINO_CODE = "0071,71801,71801"
+TODAY = "10/06/2026"
+TOMORROW = "15/06/2026"
 
-def get_response_data(text: str) -> dict:
-    pattern = r"handle(?:Exception|Callback)\([^,]+,[^,]+,(.*?)\);"
-    match = re.compile(pattern, re.DOTALL).search(text)
-    obj_text = match.group(1)
-
-    return demjson3.decode(obj_text)
+SEARCH_URL = "https://venta.renfe.com/vol/buscarTren.do?Idioma=es&Pais=ES"
+HOME_URL = "https://www.renfe.com/es/es"
 
 
-CHARMAP = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ*$"
+# ---------------------------------------------------------------------------
+# Session bootstrap — visit renfe.com first so the browser receives all
+# first-party cookies, then POST the search form.
+# ---------------------------------------------------------------------------
 
 
-def tokenify(number):
-    number = int(number)
-    out = []
-
-    while number > 0:
-        out.append(CHARMAP[number & 0x3F])
-        number //= 64
-
-    return "".join(out)
-
-
-def generate_page_id():
-    return tokenify(int(time.time() * 1000)) + "-" + tokenify(random.random() * 1e16)
-
-
-# LOGIN
-
-login_url = "https://venta.renfe.com/vol/dwr/call/plaincall/__System.generateId.dwr"
-login_body = """
-callCount=1
-c0-scriptName=__System
-c0-methodName=generateId
-c0-id=0
-batchId=1
-instanceId=0
-page=%2Fvol%2FbuscarTrenEnlaces.do
-scriptSessionId=
-windowName=
-"""
-response = requests.post(login_url, data=login_body, headers=HEADERS)
-if not response.ok:
-    raise RuntimeError("Login not valid")
-
-# CHECK SESSION
-
-script_session_id = f"{get_response_data(response.text)}/{generate_page_id()}"
-check_url = (
-    "https://venta.renfe.com/vol/dwr/call/plaincall/sesionManager.checkSession.dwr"
-)
-check_body = f"""
-callCount=1
-windowName=
-c0-scriptName=sesionManager
-c0-methodName=checkSession
-c0-id=0
-batchId=0
-instanceId=0
-page=%2Fvol%2FbuscarTrenEnlaces.do
-scriptSessionId={script_session_id}
-"""
-response = requests.post(check_url, data=check_body, headers=HEADERS)
-if not response.ok:
-    raise RuntimeError("Not checked")
-
-# UPDATE SESSION OBJECT
-
-update_url = "https://venta.renfe.com/vol/dwr/call/plaincall/buyEnlacesManager.actualizaObjetosSesion.dwr"
-update_body = f"""
-callCount=1
-windowName=
-c0-scriptName=buyEnlacesManager
-c0-methodName=actualizaObjetosSesion
-c0-id=0
-c0-e1=string:_YZlP
-c0-e2=string:
-c0-param0=array:[reference:c0-e1,reference:c0-e2]
-batchId=1
-instanceId=0
-page=%2Fvol%2FbuscarTrenEnlaces.do%3Fc%3D_YZlP
-scriptSessionId={script_session_id}
-"""
-response = requests.post(update_url, data=update_body, headers=HEADERS)
-if not response.ok:
-    raise RuntimeError("Not updated")
-
-data = get_response_data(response.text)
-# ['appl', 'cause', 'cdgoError', 'isIda', 'javaClassName', 'localizedMessage', 'message', 'msgError', 'parametros', 'plaza', 'stackTrace', 'suppressed', 'tramo']
-print(data["message"])
-
-exit()
-# GET TRAINS
-
-url = "https://venta.renfe.com/vol/dwr/call/plaincall/trainEnlacesManager.getTrainsList.dwr"
-headers = {
-    **HEADERS,
-    "Akamai-Key": "MADRI, BARCE, 30/05/2026, 30/05/2026, IV, , 1, 0, 0, 0, 0, 0, 0, 0, , , , ,",
-}
-payload = (
+def get_trains_html(
+    origen_name: str,
+    origen_code: str,
+    destino_name: str,
+    destino_code: str,
+    fecha_ida: str,
+    fecha_vuelta: str,
+    adultos: int = 1,
+    headless: bool = True,
+) -> str:
     """
-callCount=1
-windowName=
-c0-scriptName=trainEnlacesManager
-c0-methodName=getTrainsList
-c0-id=0
-c0-e1=string:false
-c0-e2=string:false
-c0-e3=string:false
-c0-e4=string:
-c0-e5=string:
-c0-e6=string:
-c0-e7=string:
-c0-e8=string:25%2F05%2F2026
-c0-e9=string:26%2F05%2F2026
-c0-e10=string:1
-c0-e11=string:0
-c0-e12=string:0
-c0-e13=string:IV
-c0-e14=string:
-c0-e15=string:false
-c0-e16=string:false
-c0-e17=string:MADRI
-c0-e18=string:BARCE
-c0-e19=string:
-c0-param0=Object_Object:{atendo:reference:c0-e1, sinEnlace:reference:c0-e2, plazaH:reference:c0-e3, tipoFranjaI:reference:c0-e4, tipoFranjaV:reference:c0-e5, horaFranjaIda:reference:c0-e6, horaFranjaVuelta:reference:c0-e7, fechaSalida:reference:c0-e8, fechaVuelta:reference:c0-e9, adultos:reference:c0-e10, ninos:reference:c0-e11, ninosMenores:reference:c0-e12, trayecto:reference:c0-e13, idaVuelta:reference:c0-e14, conMascota:reference:c0-e15, conBicicleta:reference:c0-e16, origen:reference:c0-e17, destino:reference:c0-e18, codPromo:reference:c0-e19}
-batchId=2
-instanceId=0
-page=%2Fvol%2FbuscarTrenEnlaces.do%3Fc%3D_YZlP
-"""
-    + f"scriptSessionId={script_session_id}"
-)
+    Launches a Chromium browser, warms up the session on renfe.com,
+    then POSTs the train-search form and returns the result HTML.
+    """
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=headless,
+            args=["--no-sandbox", "--disable-dev-shm-usage"],
+        )
+        ctx = browser.new_context(
+            locale="es-ES",
+            timezone_id="Europe/Madrid",
+            user_agent=(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) "
+                "Gecko/20100101 Firefox/151.0"
+            ),
+            extra_http_headers={
+                "Accept-Language": "en,es-ES;q=0.9,ca;q=0.8",
+            },
+        )
+        page = ctx.new_page()
 
-response = requests.post(url, headers=headers, data=payload)
+        # ── Step 1: visit renfe.com to get AMCV / OneTrust / f5 cookies ──────
+        print("  [1/3] Loading renfe.com to warm up session cookies…")
+        try:
+            page.goto(HOME_URL, wait_until="domcontentloaded", timeout=30_000)
+            # Accept cookie banner if present
+            try:
+                page.click("#onetrust-accept-btn-handler", timeout=5_000)
+            except PWTimeout:
+                pass  # no banner — fine
+            time.sleep(1)
+        except PWTimeout:
+            print("       Warning: renfe.com load timed out, continuing anyway.")
 
-if not response.ok:
-    raise RuntimeError("Error getting trains")
+        # ── Step 2: POST search form via fetch() from inside the page ─────────
+        print("  [2/3] Submitting train search…")
+        form_params = {
+            "tipoBusqueda": "autocomplete",
+            "currenLocation": "menuBusqueda",
+            "vengoderenfecom": "SI",
+            "desOrigen": origen_name,
+            "desDestino": destino_name,
+            "cdgoOrigen": origen_code,
+            "cdgoDestino": destino_code,
+            "idiomaBusqueda": "ES",
+            "FechaIdaSel": fecha_ida,
+            "FechaVueltaSel": fecha_vuelta,
+            "_fechaIdaVisual": fecha_ida,
+            "_fechaVueltaVisual": fecha_vuelta,
+            "minPriceDeparture": "false",
+            "minPriceReturn": "false",
+            "adultos_": str(adultos),
+            "ninos_": "0",
+            "ninosMenores": "0",
+            "codPromocional": "",
+            "plazaH": "false",
+            "sinEnlace": "false",
+            "conMascota": "false",
+            "conBicicleta": "false",
+            "asistencia": "false",
+            "franjaHoraI": "",
+            "franjaHoraV": "",
+            "Idioma": "es",
+            "Pais": "ES",
+        }
 
-data = get_response_data(response.text)
-print(data.keys())
+        # Use page.goto with a POST via a temporary form submit (most reliable
+        # approach — avoids CORS/fetch complications from the renfe.com origin).
+        submit_js = f"""
+        (() => {{
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{SEARCH_URL}';
+            const data = {json.dumps(form_params)};
+            for (const [k, v] of Object.entries(data)) {{
+                const inp = document.createElement('input');
+                inp.type  = 'hidden';
+                inp.name  = k;
+                inp.value = v;
+                form.appendChild(inp);
+            }}
+            document.body.appendChild(form);
+            form.submit();
+        }})();
+        """
+        page.evaluate(submit_js)
+
+        # ── Step 3: wait for the results page ────────────────────────────────
+        print("  [3/3] Waiting for results…")
+        try:
+            time.sleep(2)
+            # Wait for either the results table or a known error element
+            page.wait_for_selector("#listaTrenesTBodyIda > *", timeout=10_000)
+        except PWTimeout:
+            print("       Warning: results selector not found within 10 s.")
+
+        # Handle QueueIT waiting room — if we land there, wait up to 3 min
+        for _ in range(36):
+            if "queue-it" in page.url or "queueit" in page.url.lower():
+                print("       QueueIT waiting room detected, waiting 5 s…")
+                time.sleep(5)
+                try:
+                    page.wait_for_selector(
+                        "#tblAva0, .tbl-resultado, .noDisponible",
+                        timeout=10_000,
+                    )
+                    break
+                except PWTimeout:
+                    continue
+            else:
+                break
+
+        html = page.content()
+        browser.close()
+        return html
+
+
+def _penc(v: str) -> str:
+    """Percent-encode a form value (simple version)."""
+    from urllib.parse import quote_plus
+
+    return quote_plus(str(v))
+
+
+# ---------------------------------------------------------------------------
+# Parsers
+# ---------------------------------------------------------------------------
+
+
+def parse_trains(html: str) -> dict:
+    soup = BeautifulSoup(html, "html.parser")
+    result = {"outbound": [], "inbound": []}
+
+    for direction, table_id in [
+        ("outbound", "listaTrenesTBodyIda"),
+        ("inbound", "listaTrenesTBodyVuelta"),
+    ]:
+        table = soup.find("div", id=table_id)
+        if not table:
+            continue
+        for row in table.select(".selectedTren"):
+            times = row.find_all("h5")
+            if len(times) < 2:
+                continue
+            departure = _text(times[0])
+            arrival = _text(times[1])
+            train_type = "AVE"
+            prices = [_text(card) for card in row.select(".precio-cards")]
+            if not departure:
+                continue
+            result[direction].append(
+                {
+                    "train_type": train_type,
+                    "departure": departure,
+                    "arrival": arrival,
+                    "prices": prices,
+                }
+            )
+
+    return result
+
+
+def _text(tag) -> str:
+    return tag.get_text(separator=" ", strip=True) if tag else ""
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def build_args() -> argparse.Namespace:
+    ap = argparse.ArgumentParser(description="Renfe train search scraper")
+    ap.add_argument(
+        "--origen",
+        default=DEFAULT_ORIGEN_CODE,
+        help="Origin station code  (default: Alicante Terminal)",
+    )
+    ap.add_argument("--origen-name", default=DEFAULT_ORIGEN_NAME)
+    ap.add_argument(
+        "--destino",
+        default=DEFAULT_DESTINO_CODE,
+        help="Destination station code  (default: A Coruña)",
+    )
+    ap.add_argument("--destino-name", default=DEFAULT_DESTINO_NAME)
+    ap.add_argument(
+        "--ida", default=TODAY, help="Outbound date  DD/MM/YYYY  (default: today)"
+    )
+    ap.add_argument(
+        "--vuelta",
+        default=TOMORROW,
+        help="Return date    DD/MM/YYYY  (default: tomorrow)",
+    )
+    ap.add_argument("--adultos", type=int, default=1)
+    ap.add_argument(
+        "--no-headless",
+        dest="headless",
+        action="store_false",
+        help="Show the browser window (useful for debugging)",
+    )
+    ap.set_defaults(headless=True)
+    return ap.parse_args()
+
+
+def main() -> None:
+    args = build_args()
+
+    print("\nRenfe train search")
+    print(f"  {args.origen_name}  →  {args.destino_name}")
+    print(f"  Ida: {args.ida}   Vuelta: {args.vuelta}   Adultos: {args.adultos}")
+    print()
+
+    html = get_trains_html(
+        origen_name=args.origen_name,
+        origen_code=args.origen,
+        destino_name=args.destino_name,
+        destino_code=args.destino,
+        fecha_ida=args.ida,
+        fecha_vuelta=args.vuelta,
+        adultos=args.adultos,
+        headless=args.headless,
+    )
+
+    print(f"\nResponse size: {len(html):,} characters")
+    trains = parse_trains(html)
+
+    # ── Print results ────────────────────────────────────────────────────────
+    for direction, entries in trains.items():
+        print(direction)
+        if entries:
+            for t in entries:
+                price = min(t["prices"])
+                print(f"{t['departure']}: {price} ({t['train_type']})")
+        else:
+            print("(none parsed)")
+
+
+if __name__ == "__main__":
+    main()
