@@ -1,10 +1,12 @@
 import argparse
 import json
-import time
-from datetime import date
+from time import sleep
+from datetime import date, datetime, time, timedelta, timezone
 
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+
+from shared.models import Provider, Train
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -64,7 +66,7 @@ def get_trains_html(
                 page.click("#onetrust-accept-btn-handler", timeout=5_000)
             except PWTimeout:
                 pass  # no banner — fine
-            time.sleep(1)
+            sleep(1)
         except PWTimeout:
             print("       Warning: renfe.com load timed out, continuing anyway.")
 
@@ -122,7 +124,7 @@ def get_trains_html(
 
         # ── Step 3: wait for the results page ────────────────────────────────
         try:
-            time.sleep(2)
+            sleep(2)
             # Wait for either the results table or a known error element
             page.wait_for_selector("#listaTrenesTBodyIda > *", timeout=10_000)
         except PWTimeout:
@@ -132,7 +134,7 @@ def get_trains_html(
         for _ in range(36):
             if "queue-it" in page.url or "queueit" in page.url.lower():
                 print("       QueueIT waiting room detected, waiting 5 s…")
-                time.sleep(5)
+                sleep(5)
                 try:
                     page.wait_for_selector(
                         "#tblAva0, .tbl-resultado, .noDisponible",
@@ -169,15 +171,13 @@ def parse_trains(html: str) -> dict:
             times = row.find_all("h5")
             if len(times) < 2:
                 continue
-            departure = _text(times[0])
+            departure = _time(times[0])
             if not departure:
                 continue
-            arrival = _text(times[1])
-            train_type = "AVE"
-            prices = [_text(card) for card in row.select(".precio-cards")]
+            arrival = _time(times[1])
+            prices = [_float(card) for card in row.select(".precio-cards")]
             result[direction].append(
                 {
-                    "train_type": train_type,
                     "departure": departure,
                     "arrival": arrival,
                     "prices": prices,
@@ -189,6 +189,17 @@ def parse_trains(html: str) -> dict:
 
 def _text(tag) -> str:
     return tag.get_text(separator=" ", strip=True) if tag else ""
+
+
+def _float(tag) -> float:
+    text = _text(tag).replace("€", "").replace(",", ".")
+    return float(text)
+
+
+def _time(tag) -> time:
+    text = _text(tag).replace("h", "").replace(" ", "")
+    [hour, minute] = text.split(":")
+    return time(hour=int(hour), minute=int(minute), tzinfo=timezone(timedelta(hours=2)))
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +225,6 @@ def build_args() -> argparse.Namespace:
 
 
 def run(outbound_date: date, inbound_date: date):
-    print("–– RENFE ––")
     args = build_args()
     html = get_trains_html(
         origen_name=args.origen_name,
@@ -228,11 +238,23 @@ def run(outbound_date: date, inbound_date: date):
     )
     trains = parse_trains(html)
 
+    result = {"outbound": [], "inbound": []}
     for direction, entries in trains.items():
-        print(direction)
-        if entries:
-            for t in entries:
-                price = min(t["prices"]) if t["prices"] else None
-                print(f"{t['departure']}: {price} ({t['train_type']})")
-        else:
-            print("(none parsed)")
+        if direction not in result:
+            continue
+        for t in entries:
+            price = min(t["prices"]) if t["prices"] else None
+            thisbound_date = outbound_date if direction == "outbound" else inbound_date
+            dept_time = datetime.combine(thisbound_date, t["departure"])
+            arvl_time = datetime.combine(thisbound_date, t["arrival"])
+            result[direction].append(
+                Train(
+                    service_id=None,
+                    departure_time=dept_time,
+                    arrival_time=arvl_time,
+                    price=price,
+                    provider=Provider.RENFE,
+                )
+            )
+
+    return result

@@ -1,13 +1,14 @@
 import json
 import requests
-from datetime import date
+from datetime import date, datetime
+
+from shared.models import Provider, Train
 
 
 BASE_API = "https://mdw02.api-es.ouigo.com/api"
 
 
-def run(outbound_date: date, inbound_date: date):
-    print("–– OUIGO ––")
+def run(outbound_date: date, inbound_date: date) -> dict[str, list[Train]]:
     # Make login request to get token
     url = f"{BASE_API}/Token/login"
     payload = {"username": "ouigo.responsive", "password": "SquirelWeb!2020"}
@@ -57,11 +58,21 @@ def run(outbound_date: date, inbound_date: date):
         raise RuntimeError("Not able to get journeysearch data")
     data: dict = response.json()
 
-    # Explore results
+    result = {"outbound": [], "inbound": []}
     for destination, trains in data.items():
-        if destination not in ("inbound", "outbound"):
+        if destination not in result:
             continue
-        print(destination)
         for train in trains:
-            dep_time = train["departure_station"]["departure_timestamp"]
-            print(f"{dep_time}: {train['price']} ({train['service_name']})")
+            dep_time_str = train["departure_station"]["departure_timestamp"]
+            arr_time_str = train["arrival_station"]["arrival_timestamp"]
+            result[destination].append(
+                Train(
+                    service_id=train["service_name"],
+                    departure_time=datetime.fromisoformat(dep_time_str),
+                    arrival_time=datetime.fromisoformat(arr_time_str),
+                    price=train["price"],
+                    provider=Provider.OUIGO,
+                )
+            )
+
+    return result

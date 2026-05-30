@@ -1,5 +1,7 @@
 import requests
-from datetime import date
+from datetime import date, datetime
+
+from shared.models import Provider, Train
 
 
 HEADERS = {
@@ -18,8 +20,7 @@ HEADERS = {
 }
 
 
-def run(outbound_date: date, inbound_date: date):
-    print("–– IRYO ––")
+def run(outbound_date: date, inbound_date: date) -> dict[str, list[Train]]:
     login_url = "https://api.iryo.eu/b2c/config/sales-channel?lang=es&kcClient=b2c&requestChannel=WEB&uuid="
     response = requests.get(login_url, headers=HEADERS)
     if not response.ok:
@@ -54,12 +55,13 @@ def run(outbound_date: date, inbound_date: date):
     data: dict = response.json()["data"]
     travels = data.get("offer", {}).get("travels", {})
 
+    result = {"outbound": [], "inbound": []}
     for travel in travels:
-        print(travel["direction"])
+        direction = travel["direction"]
         for route in travel.get("routes", []):
             main_leg = route.get("legs")[0]
-            dep_time = main_leg["departure_station"]["departure_timestamp"]
-
+            dep_time_str = main_leg["departure_station"]["departure_timestamp"]
+            arr_time_str = main_leg["arrival_station"]["arrival_timestamp"]
             price = min(
                 [
                     item["price"]
@@ -67,4 +69,14 @@ def run(outbound_date: date, inbound_date: date):
                     if item["price"] > 0
                 ]
             )
-            print(f"{dep_time}: {price} ({main_leg['service_name']})")
+            result[direction].append(
+                Train(
+                    service_id=main_leg["service_name"],
+                    departure_time=datetime.fromisoformat(dep_time_str),
+                    arrival_time=datetime.fromisoformat(arr_time_str),
+                    price=float(price),
+                    provider=Provider.IRYO,
+                )
+            )
+
+    return result
