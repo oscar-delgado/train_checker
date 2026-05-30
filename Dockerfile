@@ -8,12 +8,17 @@ ENV POETRY_VIRTUALENVS_CREATE=false
 
 RUN pip install --no-cache-dir poetry==2.3.3
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+    libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+    libxrandr2 libgbm1 libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml poetry.lock ./
 
 RUN poetry install
 
-RUN poetry run playwright install chromium
-RUN poetry run playwright install-deps
+RUN playwright install chromium
 
 COPY . .
 
