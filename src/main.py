@@ -23,8 +23,8 @@ all_inbound = [
     *renfe_trains["inbound"],
 ]
 
-ordered_out = sorted(all_outbound, key=lambda x: x.price)
-ordered_in = sorted(all_inbound, key=lambda x: x.price)
+ordered_out = sorted(all_outbound)
+ordered_in = sorted(all_inbound)
 
 print("- Outbound")
 for t in ordered_out[:MAX_TRAINS]:
