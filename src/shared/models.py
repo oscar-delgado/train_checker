@@ -18,7 +18,10 @@ class Train:
     provider: Provider
 
     def __str__(self):
-        return f"{self.departure_time.isoformat()} - {self.arrival_time.isoformat()}: {self.price}€ ({self.provider.value.capitalize()})"
+        departure = self.departure_time.isoformat()
+        arrival = self.arrival_time.isoformat()
+        provider = self.provider.capitalize()
+        return f"{departure} - {arrival}: {self.price}€ ({provider})"
 
     def __lt__(self, other):
         self_key = float("inf") if self.price is None else self.price
