@@ -22,4 +22,6 @@ RUN playwright install chromium
 
 COPY . .
 
-CMD [ "python", "src/main.py" ]
+EXPOSE 8000
+
+CMD [ "fastapi", "dev", "src/main.py", "--host", "0.0.0.0" ]
