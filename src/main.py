@@ -20,7 +20,7 @@ def get_trains(
     outbound: date = date.today(),
     inbound: date = date.today(),
     price_increase: float = 1.2,
-) -> dict[str, list]:
+):
     iryo_trains = iryo_run(outbound, inbound)
     ouigo_trains = ouigo_run(outbound, inbound)
     renfe_trains = renfe_run(outbound, inbound)
@@ -43,7 +43,7 @@ def get_trains(
     cheapest_inbound = ordered_in[0].price
 
     def filtered(train, cheapest_price, price_increase=price_increase):
-        return train.price > cheapest_price * price_increase
+        return train.price > cheapest_price * price_increase if train.price else True
 
     return dict(
         outbound=[
